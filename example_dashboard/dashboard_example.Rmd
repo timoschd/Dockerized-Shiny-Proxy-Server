@@ -7,7 +7,7 @@ output:
     source_code: embed
 runtime: shiny
 ---
-
+original source: https://beta.rstudioconnect.com/jjallaire/htmlwidgets-d3heatmap/htmlwidgets-d3heatmap.html <br>
 ```{r setup, include=FALSE}
 library(knitr)
 library(d3heatmap)
