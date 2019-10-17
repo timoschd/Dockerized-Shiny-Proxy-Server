@@ -1,0 +1,35 @@
+proxy:
+  title: Data Dashboards
+  hide-navbar: true
+  landing-page: /
+  logo-url: https://www.karrieretutor.de/startseite/wp-content/themes/karrieretutor/assets/images/logo-karriere-tutor.png
+  port: 3838
+  docker:
+    internal-networking: true
+  specs:
+  - id: 01_kursnet_dashboard
+    display-name: Kursnet Dashboard
+    description: 
+    container-cmd: ["R", "-e", "rmarkdown::run('/bin/Dashboard_kursnet_ranking.Rmd', shiny_args = list(port = 3838, host = '0.0.0.0'))"]
+    container-image: kursnetdashboard2
+    container-network: kt-net
+    container-env:
+      user: "shiny"
+      environment:
+        - APPLICATION_LOGS_TO_STDOUT=false
+  - id: 06_test
+    display-name: test Shiny
+    description: Application which demonstrates the basics of a Shiny app
+    container-cmd: ["R", "-e", "shinyproxy::run_06_tabsets()"]
+    container-image: openanalytics/shinyproxy-demo
+    container-network:  kt-net
+  - id: 07_test
+    display-name: test flexdashboard
+    description: Application which demonstrates the basics of flexdashboard
+    container-cmd: ["R", "-e", "rmarkdown::run('/bin/dashboard_example.Rmd', shiny_args = list(port = 3838, host = '0.0.0.0'))"]
+    container-image: example_dashboard
+    container-network:  kt-net
+
+logging:
+  file:
+   shinyproxy.log
