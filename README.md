@@ -1,6 +1,6 @@
 # Dockerized Shiny Proxy
 
-Shiny proxy docker image which spins up dockerized shiny apps in a flexdashbaord wrapper <br> <br>
+Shiny proxy docker image which spins up dockerized shiny apps in a flexdashboard wrapper <br> <br>
 
 1. Build the dockerimage for the example flexdashboard with `docker build -t example_dashboard` . <br>
 2. Build the shiny_proxy dockerimage with `docker build -t shiny_proxy` . <br>
