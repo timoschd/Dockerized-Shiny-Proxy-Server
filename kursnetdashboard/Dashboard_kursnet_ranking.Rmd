@@ -1,0 +1,439 @@
+---
+title: "Kursnet Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    navbar:
+    
+    orientation: rows
+    vertical_layout: scroll
+    css: bootswatch-3.3.5-4/flatly/bootstrap.css
+    logo: Logo-karriere-tutor.png
+runtime: shiny
+---
+<style>                     
+.navbar {
+  background-color:#1E2143;
+  border-color:#D66400;
+}
+
+</style>   
+
+```{r setup, include=FALSE}
+# global options
+options(digits = 2, scipen=7)
+
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+
+library("flexdashboard")
+library("shiny")
+library("tidyverse")
+library("DBI")
+library("dbplyr")
+library("pool")
+library("lubridate")
+library("plotly")
+library("stringi")
+
+
+pw<- "9caa1bb5301be851"
+
+```
+
+
+Ranking Scraping
+===================================== 
+
+```{r, eval=FALSE}
+# connection eval=FALSE old
+connection.raw <- DBI::dbConnect(RMySQL::MySQL(), 
+                             host = "127.0.0.1",
+                             port= 3306 ,
+                             user = "kursnet-results",
+                             dbname = "scrape_lucenta_staging",
+                             password = pw)
+
+DW.raw.search<- tbl(connection.raw,"scrape_search")
+DW.raw.results<- tbl(connection.raw,"scrape_results")
+
+
+```
+
+```{r, eval=TRUE, message=FALSE, warning=FALSE, results='hide'}
+
+connection.raw <- dbPool(
+            drv = RMySQL::MySQL(),
+            dbname = "scrape_lucenta_staging",
+            host = "cloudsql-proxy",
+            port = 3306,
+            username = "kursnet-results",
+            password = pw
+)
+
+# set pool leider nötig, um queries in UTF-8 zu bekommen: besser connection management pool überlassen
+connection.raw.pool<- poolCheckout(connection.raw)
+dbSendQuery(connection.raw.pool, 'set character set "utf8"')
+
+onStop(function() {
+    poolClose(connection.raw)
+})
+
+```
+
+Inputs 1{.sidebar}
+-------------------------------------
+
+```{r, eval=TRUE,  message=FALSE, warning=FALSE}
+
+# get input list 
+#locations <- DW.raw.search %>%
+#  select(search_location) %>%
+#  distinct() %>% 
+#  arrange(search_location) %>% 
+#  show_query()
+
+locations_query<- "SELECT DISTINCT `search_location`
+FROM `scrape_search`
+ORDER BY `search_location`"
+
+
+
+locations<- dbGetQuery(connection.raw.pool, locations_query)
+
+#keywords <- DW.raw.search %>%
+#  select(search_word ) %>%
+#  as_tibble %>%
+#  unique %>% 
+#  arrange(search_word)
+
+keywords_query<- "SELECT DISTINCT `search_word`
+FROM `scrape_search`
+ORDER BY `search_word`"
+
+keywords<- dbGetQuery(connection.raw.pool, keywords_query)
+#keywords$search_word <- stri_encode(keywords$search_word, "", "UTF-8")
+#locations$search_location <- stri_encode(locations$search_location, "", "UTF-8")
+
+# shiny inputs defined here
+selectInput("Stadt", label = "Stadt",
+            choices = locations$search_location, selected = "Bremen")
+
+selectInput("Suchwort", label = "Suchwort",
+            choices = keywords$search_word, selected = "SAP")
+
+checkboxInput("CheckLastWeeks", "Nur Daten der letzten 14 Tage", TRUE)
+
+
+actionButton("Start", label="Start")
+
+
+```
+ 
+Column 1 {}
+-----------------------------------------------------------------------
+
+```{r}
+
+# on button click (input$do): renderTable
+mydata_ranking<- eventReactive(input$Start, {
+    
+  # Progress bar         
+ withProgress(message = 'Hole Daten', value = 0, {
+   incProgress(0.25)
+   
+
+
+# sql statement, abgeleit aus dbplyr code durch render_sql 
+ sql<- "SELECT *
+            FROM (SELECT `LHS`.`page_rank` AS `page_rank.x`, `LHS`.`scrape_search` AS `scrape_search`, `LHS`.`title` AS `title`, `LHS`.`title_link` AS `title_link`, `LHS`.`street` AS `street`, `LHS`.`zip` AS `zip`, `LHS`.`city` AS `city`, 
+            `LHS`.`telefon` AS `telefon`, `LHS`.`telefax` AS `telefax`, 
+            `LHS`.`email` AS `email`, `LHS`.`beginn` AS `beginn`, `LHS`.`bildungsart` AS `bildungsart`, `LHS`.`foerderung` AS `foerderung`, `LHS`.`bildungsanbieter_street` AS `bildungsanbieter_street`, `LHS`.`bildungsanbieter_zip` AS `bildungsanbieter_zip`, `LHS`.`bildungsanbieter_city` AS `bildungsanbieter_city`, `LHS`.`timestamp` AS `timestamp.x`, `RHS`.`search_word` AS `search_word`, `RHS`.`search_location` AS `search_location`, `RHS`.`category` AS `category`, `RHS`.`scrape_date` AS `scrape_date`, `RHS`.`search_key` AS `search_key`, `RHS`.`location` AS `location`, `RHS`.`page_rank` AS `page_rank.y`, `RHS`.`nb_results` AS `nb_results`, `RHS`.`timestamp` AS `timestamp.y`, `RHS`.`search_key_fallback` AS `search_key_fallback`, `RHS`.`scraping_code` AS `scraping_code`, `RHS`.`scraping_code_description` AS `scraping_code_description`
+                  FROM `scrape_results` AS `LHS`
+                  LEFT JOIN `scrape_search` AS `RHS`
+                  ON (`LHS`.`scrape_search` = `RHS`.`id`)
+            ) `dbplyr_001`
+
+WHERE (`search_key` = ?search_key)"
+
+ 
+
+  # sql injection save query     
+ query <- sqlInterpolate(connection.raw.pool, sql, search_key= paste(input$Suchwort, "___", input$Stadt, sep=""))
+ 
+# original WHERE clause auf search_location und search_word, geändert da nur auf search_key Index
+ #WHERE (`search_location` = ?city AND `search_word` = ?keyword)"
+ #query <- sqlInterpolate(connection.raw, sql, city=input$Stadt, keyword=input$Suchwort)
+ 
+ 
+ 
+ dbGetQuery(connection.raw.pool, query) %>% 
+ 
+# dplyr manipulation
+  
+   mutate(scrape_date = as.POSIXct(scrape_date)) %>%
+   {
+     if (input$CheckLastWeeks)
+       filter(., scrape_date >= max(scrape_date) - days(14))
+     else
+       .
+   } %>%
+   mutate(VeranstaltungsID = str_extract(title_link, "\\d{8}")) %>%
+   mutate(key = paste(VeranstaltungsID, zip, city)) %>%  
+
+  
+# Visualisierung
+   
+ plot_ly(
+            x = ~ scrape_date,
+            y = ~ page_rank.x,
+            split = ~ VeranstaltungsID,
+            color = ~ email,
+            mode = "lines+markers" ,
+            type = "scatter",
+            alpha = 0.8,
+            marker = list(size = 4),
+            line = list(size = 2),
+            colors = "Dark2",
+            #colorscale='Viridis',
+            #reversescale =T,
+            text= ~ paste(title,"\n",email,city),
+            hoverinfo = 'text'
+            #hovertemplate = paste( '%{email}',
+                        #           '%{city}')
+                   
+            
+) %>% 
+
+            layout(
+                        title = ~search_key,
+                        yaxis = list(title = "Ranking (page_rank)", autorange="reversed"),
+                        xaxis = list(title = "Datum (scrape_date)")
+                                                )  %>% 
+   hide_colorbar() %>%  
+   hide_legend()  
+          
+
+        
+ 
+
+ 
+            })                                    
+})
+
+renderPlotly({   mydata_ranking()
+   #dbDisconnect(connection.raw)
+   })
+
+
+# render hover information too?
+
+#renderPrint({
+ # d<-  event_data("plotly_hover")
+ # if (is.nul#se d
+#})127.0.0.1
+
+
+# close db connection? ->ist in onStop via pool in chunk3 festgelegt
+#on.exit(dbDisconnect(connection.raw), add = TRUE)
+#dbDisconnect(connection.raw)
+
+```
+
+
+Systematik Scraping
+===================================== 
+
+```{r, eval=FALSE}
+
+# connection eval=FALSE old
+scrape_kursnetexplorer <- DBI::dbConnect(RMySQL::MySQL(), 
+                                         host = "host.docker.internal",
+                                         port= 33 ,
+                                         user = "kursnet-results",
+                                         dbname = "scrape_kursnetexplorer",
+                                         password = pw)
+
+v_systematik_course_ranking<- tbl(scrape_kursnetexplorer,"v_systematik_course_ranking")
+systematik_location<- tbl(scrape_kursnetexplorer,"systematik_location")
+systematik_category<- tbl(scrape_kursnetexplorer,"systematik_category")
+
+onStop(function() {
+    dbDisconnect(scrape_kursnetexplorer)
+})
+
+```
+
+```{r, eval=TRUE, message=FALSE, warning=FALSE, results="hide"}
+
+scrape_kursnetexplorer <- dbPool(
+            drv = RMySQL::MySQL(),
+            dbname = "scrape_kursnetexplorer",
+            host = "cloudsql-proxy",
+            port = 3306,
+            username = "kursnet-results",
+            password = pw
+)
+
+# set pool leider nötig, um queries in UTF-8 zu bekommen: besser connection management pool überlassen
+scrape_kursnetexplorer.pool<- poolCheckout(scrape_kursnetexplorer)
+dbSendQuery(scrape_kursnetexplorer.pool, 'set character set "utf8"')
+
+
+onStop(function() {
+    poolClose(scrape_kursnetexplorer)
+})
+
+
+
+```
+Inputs 2{.sidebar}
+-------------------------------------
+
+```{r, eval=TRUE, warning=FALSE, message=FALSE}
+# get input list 
+
+#locations2 <- systematik_location %>%
+#  select(name) %>%
+#  as_tibble %>%
+ # unique %>% 
+ # arrange(name)
+
+#systematik <- systematik_category %>%
+#  select(name,code,depth) %>%
+#  as_tibble %>%
+#  unique %>% 
+#  arrange(name)
+
+
+locations2_query<- "SELECT DISTINCT `name`
+FROM `systematik_location`
+ORDER BY `name`"
+
+
+locations2<- dbGetQuery(scrape_kursnetexplorer.pool, locations2_query)
+
+
+systematik_query<- "SELECT DISTINCT `name`
+FROM `systematik_category`
+ORDER BY `name`"
+
+systematik <- dbGetQuery(scrape_kursnetexplorer.pool, systematik_query)
+#systematik$name <- stri_encode(systematik$name, "", "UTF-8")
+#locations2$name <- stri_encode(locations2$name, "", "UTF-8")
+
+
+# shiny inputs defined here
+selectInput("city", label = "Stadt",
+            choices = locations2$name, selected = "Bremen")
+
+selectInput("Systematik", label = "Systematik",
+            choices = systematik$name, selected = "IT-Projektmanagement")
+
+checkboxInput("CheckLastWeeks2", "Nur Daten der letzten 14 Tage", TRUE)
+
+
+actionButton("Start2", label="Start")
+
+
+```
+ 
+Column 2 {data-width=1000}
+-----------------------------------------------------------------------
+
+```{r}
+
+# on button click (input$do): renderTable
+mydata_systematik<- eventReactive(input$Start2, {
+    
+  # Progress bar         
+ withProgress(message = 'Hole Daten', value = 0, {
+   incProgress(0.25)
+   
+# sql statement, abgeleit aus dbplyr code durch render_sql 
+ sql<- "SELECT *
+FROM `v_systematik_course_ranking`
+WHERE (`location_name` = ?city AND `category_name` = ?systematik)"
+
+
+  # sql injection save query        
+ query <- sqlInterpolate(scrape_kursnetexplorer.pool, sql, city=input$city, systematik=input$Systematik)
+ 
+
+ dbGetQuery(scrape_kursnetexplorer.pool, query) %>% 
+ 
+# dplyr manipulation
+  
+   mutate(date = as.POSIXct(date)) %>%
+   {
+     if (input$CheckLastWeeks2)
+       filter(., date >= max(date) - days(14))
+     else
+       .
+   } %>%
+    mutate(key= paste(kursnet_id, location_name, provider_name)) %>% 
+
+  
+# Visualisierung
+   
+ plot_ly(
+            x = ~ date,
+            y = ~ ranking,
+            split = ~ key,
+            color = ~ provider_name,
+            mode = "lines+markers" ,
+            type = "scatter",
+            alpha = 0.8,
+            marker = list(size = 4),
+            line = list(size = 2),
+            colors = "Dark2",
+            #colorscale='Viridis',
+            #reversescale =T,
+            text= ~ paste(course_name,"\n",provider_name,location_name),
+            hoverinfo = 'text'
+            #hovertemplate = paste( '%{email}',
+            #           '%{city}')
+            
+            
+) %>% 
+            
+            layout(
+                        title = ~ category_name,
+                        yaxis = list(title = "Ranking (ranking)", autorange="reversed"),
+                        xaxis = list(title = "Datum (date)")
+            )  %>% 
+            hide_colorbar() %>%  
+            hide_legend() 
+          
+
+                  
+        
+ 
+
+ 
+            })                                    
+})
+
+renderPlotly({  mydata_systematik()
+   #dbDisconnect(connection.raw)
+   })
+
+
+# render hover information too?
+
+#renderPrint({
+ # d<-  event_data("plotly_hover")
+ # if (is.null(d)) "" else d
+#})
+
+
+```
+
+About
+===================================== 
+<br><br><br><br><br><br>
+**Maintainer:** <em>tim.schendzielorz@googlemail.com</em>
+<br>
+**Last Update:** `r Sys.Date()`
+<br><br>
+This dashboard connects to the MySQL databases "scrape_lucenta_staging" and "scrape_kursnetexplorer" on the server "kt-mysql01". For more information about the data stored please contact Robert Gasch. <br><br> The purpose of this Dashboard is to show the current and past kursnet rankings similar to the website. The dashboard is written in R and implemented through Rshiny and flexdashboards. It is rendered in HTML, the graph is rendered in JavaScript via plotly. Each instance of this application runs in a new Docker container via shiny proxy. <br>
+
+
