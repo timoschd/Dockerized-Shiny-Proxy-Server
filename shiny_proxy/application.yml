@@ -12,13 +12,13 @@ proxy:
     description: Application which demonstrates the basics of a Shiny app
     container-cmd: ["R", "-e", "shinyproxy::run_06_tabsets()"]
     container-image: openanalytics/shinyproxy-demo
-    container-network:  kt-net
+    container-network:  m-net
   - id: 07_test
     display-name: test flexdashboard
     description: Application which demonstrates the basics of flexdashboard
     container-cmd: ["R", "-e", "rmarkdown::run('/bin/dashboard_example.Rmd', shiny_args = list(port = 3838, host = '0.0.0.0'))"]
     container-image: example_dashboard
-    container-network:  kt-net
+    container-network:  m-net
 
 logging:
   file:
