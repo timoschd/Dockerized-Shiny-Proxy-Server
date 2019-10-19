@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y -t unstable \
 	libgdal-dev \
 	libxml2-dev \
 	libxt-dev && \
+    # Shiny servers from rstudio only necessary for flexdashboard standalone not with shiny proxy
     wget --no-verbose https://download3.rstudio.org/ubuntu-14.04/x86_64/shiny-server-1.5.12.933-amd64.deb -O "version.txt" && \
     VERSION=$(cat version.txt)  && \
     wget --no-verbose "https://download3.rstudio.org/ubuntu-14.04/x86_64/shiny-server-1.5.12.933-amd64.deb" -O ss-latest.deb && \
@@ -35,14 +36,15 @@ RUN apt-get update && apt-get install -y -t unstable \
     rm -rf /var/lib/apt/lists/*
 
 
-
-	
+# make directory and copy the flexdashboard to the Dockerimage
 RUN mkdir -p /bin
 COPY dashboard_example.Rmd    /bin/dashboard_example.Rmd
 
 # make all app files readable (solves issue when dev in Windows, but building in Ubuntu)
 RUN chmod -R 755 /bin
 
+# expose a port of the container
 EXPOSE 3838
 
+# run the flexdashboard at the exposed port
 CMD ["R", "-e", "rmarkdown::run('/bin/dashboard_example.Rmd', shiny_args = list(port = 3838, host = '0.0.0.0'))"]
