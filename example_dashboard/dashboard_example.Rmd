@@ -1,18 +1,24 @@
 ---
-title: "NBA Scoring (2008)"
+title: "Example Flexdashboard"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
     social: menu
+    theme: paper
     source_code: embed
 runtime: shiny
 ---
-original source: https://beta.rstudioconnect.com/jjallaire/htmlwidgets-d3heatmap/htmlwidgets-d3heatmap.html <br>
-```{r setup, include=FALSE}
-library(knitr)
-library(d3heatmap)
-library(flexdashboard)
+Test HTML Widget
+===================================== 
 
+Original source for NBA Scores (2008) Flexdashboard:<br> https://beta.rstudioconnect.com/jjallaire/htmlwidgets-d3heatmap/htmlwidgets-d3heatmap.html <br>
+
+```{r setup, include=FALSE}
+library("knitr")
+library("d3heatmap")
+library("flexdashboard")
+
+# read in NBA 2008 dataset
 url <- "http://datasets.flowingdata.com/ppg2008.csv"
 nba_players <- read.csv(url, row.names = 1)
 ```
@@ -29,4 +35,54 @@ d3heatmap(nba_players, scale = "column")
 knitr::kable(nba_players[1:20,c("G", "MIN", "PTS")])
 ```
 
+Test Plotly and Shiny Elements
+=====================================
+
+Inputs 1{.sidebar} 
+-------------------------------------
+<br><br><br>
+Please press start button:<br>
+
+```{r, echo=FALSE}
+library("plotly")
+library("shiny")
+# sidebar shiny start button
+actionButton("start_button", label="Start")
+
+```
+
+Row  {data-height=1600}
+-----------------------------------------------------------------------
+
+```{r}
+# define reactive shiny function on button click
+visualization_function <- eventReactive(input$start_button, {
+    
+            # with progress bar         
+            withProgress(message = 'Make Visualization', value = 0, {
+            
+                        # increment progress bar
+                        incProgress(0.3)
+                        # stop eval to see progress bar long enough :)
+                        Sys.sleep(0.5)
+                         
+                        # make data from diamonds data sample
+                        d <- diamonds[sample(nrow(diamonds), 1000), ]
+            
+                        # make interaactive plot
+                        p <- plot_ly( d,
+                                      x = ~carat, y = ~price,
+                                      # Hover text:
+                                      text = ~paste("Price: ", price, '$<br>Cut:', cut),
+                                      color = ~carat,
+                                      size = ~carat
+                        ) 
+            })
+})
+
+# render plot for dynamically resizing to browser window
+renderPlotly({visualization_function()
+            })
+
+```
 

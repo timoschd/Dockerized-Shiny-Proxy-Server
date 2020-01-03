@@ -1,5 +1,5 @@
 proxy:
-  title: Dashboards
+  title: Test Applications
   hide-navbar: true
   landing-page: /
   logo-url: 
@@ -7,15 +7,15 @@ proxy:
   docker:
     internal-networking: true
   specs:
-  - id: 06_test
-    display-name: test Shiny
+  - id: 01_test
+    display-name: Test Shiny
     description: Application which demonstrates the basics of a Shiny app
     container-cmd: ["R", "-e", "shinyproxy::run_06_tabsets()"]
     container-image: openanalytics/shinyproxy-demo
     container-network:  m-net
-  - id: 07_test
-    display-name: test flexdashboard
-    description: Application which demonstrates the basics of flexdashboard
+  - id: 02_test
+    display-name: Test Flexdashboard
+    description: Application which demonstrates the basics of HTML Flexdashboard
     container-cmd: ["R", "-e", "rmarkdown::run('/bin/dashboard_example.Rmd', shiny_args = list(port = 3838, host = '0.0.0.0'))"]
     container-image: example_dashboard
     container-network:  m-net
