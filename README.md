@@ -8,6 +8,6 @@ Shiny proxy docker image which spins up dockerized Shiny apps in a Flexdashboard
 This will copy the application.yml and will need the image openanalytics/shinyproxy-demo for including a shiny demo. <br>
 4. Run the shiny proxy server with `docker run -d -v /var/run/docker.sock:/var/run/docker.sock --net m-net -p 3838:3838 shiny_proxy`. This maps a local volume to a directory in the docker container and maps the docker container port 3838 to your port 3838. This will run the shiny proxy server with the two example apps at localhost:3838 with a common shared container network m-net. User authentication details can be added in the application.yml.
 
-## Github pages links for embedding:
+## Page links
 [Static HTML Flexdashboard](https://timosch29.github.io/Dockerized-Shiny-Proxy-Server/example_dashboard/dashboard_example) <br>
 [Same Flexdashboard with Shiny reactivity](https://timosch.shinyapps.io/dashboard_example/#section-test-plotly-and-shiny-elements)
