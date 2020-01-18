@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y  \
             libssh2-1-dev \
             libcurl4-openssl-dev \
             libsasl2-dev \
+            libv8-dev\
             
             # following libs not installed as no Database connection needed
             #libmariadbd-dev \  
