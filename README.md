@@ -1,3 +1,9 @@
+This project is described in detail in the corresponding blog post series:
+
+**Part I:** https://medium.com/analytics-vidhya/shiny-dashboards-with-flexdashboard-e66aaafac1f2 <p>
+
+**Part II:** https://medium.com/analytics-vidhya/deploying-a-shiny-flexdashboard-with-docker-cca338a10d12
+
 # Dockerized Shiny Proxy Server
 
 Shiny proxy docker image which spins up dockerized Shiny apps in a Flexdashboard HTML wrapper. <br> <br>
